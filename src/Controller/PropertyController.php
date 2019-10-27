@@ -34,6 +34,8 @@ class PropertyController extends AbstractController
 
     /**
      * @Route("/biens/{slug}-{id}", name="property.show", requirements={"slug": "[a-z0-9\-]*"})
+     * @param Property $property
+     * @param string $slug
      * @return Response
      */
     public function show(Property $property, string $slug): Response
