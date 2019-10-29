@@ -1,10 +1,12 @@
 <?php
 namespace App\Controller\Admin;
 
+use App\Entity\Option;
 use App\Entity\Property;
 use App\Form\PropertyType;
 use App\Repository\PropertyRepository;
 use Doctrine\Common\Persistence\ObjectManager;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -26,7 +28,7 @@ class AdminPropertyController extends AbstractController
 
     /**
      * @Route("/admin", name="admin.property.index")
-     * @return \Symfony\Component\HttpFoundation\Response
+     * @return Response
      */
     public function index()
     {
@@ -36,6 +38,8 @@ class AdminPropertyController extends AbstractController
 
     /**
      * @Route("/admin/property/create", name="admin.property.new")
+     * @param Request $request
+     * @return RedirectResponse|Response
      */
     public function new(Request $request)
     {
@@ -61,7 +65,7 @@ class AdminPropertyController extends AbstractController
      * @Route("/admin/property/{id}", name="admin.property.edit", methods="GET|POST")
      * @param Property $property
      * @param Request $request
-     * @return \Symfony\Component\HttpFoundation\Response
+     * @return Response
      */
     public function edit(Property $property, Request $request)
     {
@@ -84,7 +88,7 @@ class AdminPropertyController extends AbstractController
     /**
      * @Route("/admin/property/{id}", name="admin.property.delete", methods="DELETE")
      * @param Property $property
-     * @return \Symfony\Component\HttpFoundation\RedirectResponse
+     * @return RedirectResponse
      */
     public function delete(Property $property, Request $request)
     {
