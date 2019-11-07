@@ -72,8 +72,7 @@ class AdminPropertyController extends AbstractController
         $form = $this->CreateForm(PropertyType::class, $property);
         $form->handleRequest($request);
 
-        if ($form->isSubmitted() && $form->isValid()) 
-        {
+        if ($form->isSubmitted() && $form->isValid()) {
             $this->em->flush();
             $this->addFlash('success', 'Bien modifié avec succès');
             return $this->redirectToRoute('admin.property.index');
@@ -88,6 +87,7 @@ class AdminPropertyController extends AbstractController
     /**
      * @Route("/admin/property/{id}", name="admin.property.delete", methods="DELETE")
      * @param Property $property
+     * @param Request $request
      * @return RedirectResponse
      */
     public function delete(Property $property, Request $request)
