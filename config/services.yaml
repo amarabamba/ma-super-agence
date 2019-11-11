@@ -29,3 +29,7 @@ services:
     App\Controller\Listener\ImageCacheSubscriber:
       tags:
         - { name: doctrine.event_subscriber }
+
+#    App\Notification\ContactNotification:
+#        arguments:
+#            - ’@mailer'
