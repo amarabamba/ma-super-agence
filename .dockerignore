@@ -1,0 +1,37 @@
+# Le .env est volontairement GARDÉ : Symfony 8 (Dotenv) jette une
+# PathException si /app/.env est absent. Les variables cloud priment en runtime.
+
+# Dossiers hôtes, ne doivent jamais entrer dans l'image
+.git
+.gitignore
+.idea
+.vscode
+**/.DS_Store
+
+# Dépendances : installées et buildées DANS l'image (jamais celles de l'hôte)
+vendor
+node_modules
+var
+public/build
+public/media/cache
+
+# Images uploadées en runtime (gitignorées) — on garde uniquement les
+# fichiers SUIVIS par git (placeholder des fixtures + démos du tuto)
+public/assets/images/properties/*
+!public/assets/images/properties/placeholder.jpg
+!public/assets/images/properties/5dc3fde983ffc563084768.jpg
+!public/assets/images/properties/5dc3fe0c3af7c229678313.jpg
+!public/assets/images/properties/5dc3fe8d017b2970720137.jpg
+
+# Fichiers tests / logs
+tests
+.phpunit
+.phpunit.result.cache
+*.log
+
+# Dev / secrets locaux (jamais dans l'image de prod)
+.env.local
+.env.*.local
+
+# Fichiers produits par des commandes console
+config/reference.php
