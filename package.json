@@ -1,21 +1,19 @@
 {
     "devDependencies": {
-        "@symfony/webpack-encore": "^0.28.0",
-        "core-js": "^3.0.0",
-        "regenerator-runtime": "^0.13.2",
-        "webpack-notifier": "^1.6.0"
+        "@symfony/webpack-encore": "^5.3.1",
+        "webpack-notifier": "^1.11.1"
     },
     "license": "UNLICENSED",
     "private": true,
     "scripts": {
+        "serve": "php -S 127.0.0.1:1212 -t public public/router.php",
         "dev-server": "encore dev-server",
         "dev": "encore dev",
         "watch": "encore dev --watch",
         "build": "encore production --progress"
     },
     "dependencies": {
-        "@babel/preset-flow": "^7.7.4",
-        "jquery": "^3.4.1",
-        "select2": "^4.0.12"
+        "jquery": "^3.7.1",
+        "select2": "^4.1.0-rc.0"
     }
 }
