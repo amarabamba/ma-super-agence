@@ -1,5 +1,8 @@
 security:
-    # https://symfony.com/doc/current/security.html#where-do-users-come-from-user-providers
+    # https://symfony.com/doc/current/security.html#registering-the-user-hashing-passwords
+    password_hashers:
+        App\Entity\User: 'auto'
+
     providers:
         form_database:
             entity:
@@ -11,7 +14,7 @@ security:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false
         main:
-            anonymous: true
+            lazy: true
             logout:
                 path: /logout
                 target: /
@@ -24,15 +27,11 @@ security:
 
             #http_basic: true
             form_login:
-              check_path: login
+                login_path: login
+                check_path: login
 
-    #Easy way to control access for large sections of your site
+    # Easy way to control access for large sections of your site
     # Note: Only the *first* access control that matches will be used
     access_control:
-         - { path: ^/admin, roles: ROLE_ADMIN }
+        - { path: ^/admin, roles: ROLE_ADMIN }
         # - { path: ^/profile, roles: ROLE_USER }
-
-    encoders:
-        App\Entity\User:
-          algorithm: auto
-          cost: 13

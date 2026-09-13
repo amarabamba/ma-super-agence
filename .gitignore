@@ -24,6 +24,10 @@
 
 .idea/
 /.idea/
+
+# Fichier de référence de config regénéré par les commandes console
+/config/reference.php
+
 ###> liip/imagine-bundle ###
 /public/media/cache/
 ###< liip/imagine-bundle ###
