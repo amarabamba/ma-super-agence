@@ -32,6 +32,11 @@
 /public/media/cache/
 ###< liip/imagine-bundle ###
 
+###> vich/uploader-bundle ###
+/public/assets/images/properties/*
+!/public/assets/images/properties/placeholder.jpg
+###< vich/uploader-bundle ###
+
 ###> symfony/webpack-encore-bundle ###
 /node_modules/
 /public/build/
