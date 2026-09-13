@@ -57,6 +57,9 @@ templates/                 # base + admin/, emails/, pages/, property/, security
 assets/                    # js/app.js + css/app.css (Encore entry 'app')
 public/                    # index.php, router.php, build/, asset media
 config/                    # bundles, packages/{dev,prod,test}, routes
+docker/                    # entrypoint prod + entrypoint standalone + php/prod.ini
+Dockerfile                 # multi-stage ; cible PAR DÉFAUT = production
+compose.yaml               # dev local uniquement (target standalone + mariadb)
 translations/              # forms.fr.yaml etc.
 ```
 
@@ -133,28 +136,55 @@ php bin/console about
 
 # Tests (none exist yet) — use the installed PHPUnit, not the bridge download:
 vendor/bin/phpunit
+
+# Docker (see "Deployment (Docker)") :
+docker build -t ma-super-agence .     # image de production (cible par défaut)
+docker compose up --build             # dev local : Symfony + MariaDB (fixtures auto)
+docker compose down -v                # arrêt + purge du volume MariaDB si besoin
 ```
 
 Admin credentials after fixtures: **`demo` / `demo`**.
 
-## Deployment (Railway — no Docker)
+## Deployment (Docker — Railway / Render)
 
-- Railway builds with **Railpack** (auto-detects PHP via `composer.json` + `public/index.php`,
-  serves via FrankenPHP). No Dockerfile. `public/router.php` is only for local `php -S`.
-- Build runs `composer install`, then since `package.json` exists: npm install + the `build`
-  script (Encore) → `public/build/` generated in the image (still gitignored).
-- `RAILPACK_PHP_ROOT_DIR=/app/public` env var is **required** (Railpack only defaults to
-  `public/` for Laravel).
-- PHP extensions Railpack installs are declared in `composer.json` `require`:
-  `ext-pdo_mysql`, `ext-gd`, `ext-intl`, `ext-mbstring` (all verified locally too).
-- `start-container.sh` (repo root) overrides Railpack's default start script: runs
-  `doctrine:migrations:migrate --no-interaction --allow-no-migration`, then starts FrankenPHP:
-  `docker-php-entrypoint --config /Caddyfile --adapter caddyfile`. Migrations only run at boot.
-- DB stays external MySQL (e.g. Aiven). Railway has no managed MySQL — do **not** port to
-  Postgres (migrations `instanceof AbstractMySQLPlatform` guards, `MEMBER OF` query).
-- Railway env vars: `APP_ENV=prod`, `APP_DEBUG=0`, `APP_SECRET`, `DATABASE_URL`,
-  `MAILER_DSN`, `RAILPACK_PHP_ROOT_DIR`, `COMPOSER_ALLOW_SUPERUSER=1`. `PORT` is injected.
-- Fixtures are dev-only → **not loaded in prod**; there is no `demo` user on Railway.
+- **Dockerfile multi-stage** (`Dockerfile`) : stages `php-base`, `composer-deps`
+  (vendor prod), `composer-deps-dev` (vendor dev, uniquement pour la cible dev),
+  `assets` (node:20-alpine, `npm ci` + `npm run build`), `production`, `standalone`.
+  Le **dernier stage est un alias vide `FROM production`** → `docker build .`
+  (sans `--target`) produit TOUJOURS l'image de production, y compris depuis
+  Railway/Render/GitHub Actions. `compose.yaml` cible explicitement `target: standalone`.
+- **Aucune base embarquée** : l'image Symfony ne contient ni MySQL, ni MariaDB.
+  En local, MariaDB est le service séparé `db` de `compose.yaml` (image officielle `mariadb:11`).
+- Base image : `php:8.5-cli-alpine` (multi-arch). Extensions installées via
+  `docker-php-ext-install` : `gd` (`--with-freetype --with-jpeg --with-webp`), `intl`,
+  `pdo_mysql`, `zip`. **`opcache` et `mbstring` sont déjà compilés dans l'image
+  officielle PHP — ne PAS les installer via `docker-php-ext-install`** (échec connu
+  `cp: can't stat 'modules/*'`). `opcache` est activé via `docker/php/prod.ini`
+  (`opcache.enable_cli=1`, indispensable pour `php -S`).
+- Builder les extensions avec `-j2` (un `-j$(nproc)` sur machines à nombreux cœurs
+  peut provoquer la même erreur `modules/*`).
+- Entrypoint prod (`docker/docker-entrypoint.sh`), exécuté à chaque boot : (1) refuse
+  toute `DATABASE_URL` vide ou `@localhost`/`@127.0.0.1` (exit 1 avec message),
+  (2) attend la DB via `doctrine:migrations:status` (boucle, défaut `DB_TIMEOUT=60`),
+  (3) `doctrine:migrations:migrate --allow-no-migration`, (4) démarre
+  `php -S 0.0.0.0:$PORT -t public public/router.php` (`PORT` défaut 8080).
+- Entrypoint dev (`docker/docker-entrypoint-standalone.sh`) : attend `db`, migre, puis
+  fixtures selon `LOAD_FIXTURES` (`auto` = seulement si la table `property` est vide ;
+  `1` = toujours ; `0` = jamais). Les assets des bundles sont posés au build
+  (`php bin/console assets:install public`).
+- Build **indépendant de la machine hôte** : `.dockerignore` exclut `vendor`,
+  `node_modules`, `var`, `public/build` (générés dans l'image), `tests`, et les uploads
+  runtime. `.env` est volontairement GARDÉ dans l'image (symfony 8 Dotenv jette une
+  `PathException` si `/app/.env` est absent ; les variables cloud priment au runtime).
+- Variables cloud : `APP_ENV=prod`, `APP_DEBUG=0`, `APP_SECRET`, `DATABASE_URL`,
+  `MAILER_DSN`, `PORT` (injecté par Railway/Render). Plus de `RAILPACK_PHP_ROOT_DIR`,
+  plus de `COMPOSER_ALLOW_SUPERUSER` requis pour le déploiement.
+- Piège local vérifié : un volume `ma-super-agence_db_data` hérité d'une ancienne
+  config casse les grants MariaDB (`Host '172.18.0.x' is not allowed`) car les
+  `MARIADB_*` ne s'appliquent qu'à la 1re initialisation → `docker compose down -v`.
+- DB reste externe MySQL (ex. Aiven) — ne **pas** porter vers Postgres (migrations
+  `instanceof AbstractMySQLPlatform` guards, `MEMBER OF` query).
+- Fixtures dev-only → **not loaded in prod**; there is no `demo` user on Railway/Render.
 - Public images use Lorem Picsum (`Property::getImageUrl()`) — no file storage needed.
   Vich admin uploads go to the ephemeral container FS (lost on redeploy). No S3.
 

@@ -18,7 +18,8 @@ Projet personnel d'apprentissage Symfony, initialement construit en suivant le t
 - [Configuration de l'environnement](#configuration-de-lenvironnement)
 - [Base de données](#base-de-données)
 - [Lancement en local](#lancement-en-local)
-- [Déploiement (Railway)](#déploiement-railway-)
+- [Développement local avec Docker](#développement-local-avec-docker)
+- [Déploiement (Docker)](#déploiement-docker-)
 - [Tests](#tests)
 - [Commandes utiles](#commandes-utiles)
 - [Structure du projet](#structure-du-projet)
@@ -55,6 +56,8 @@ Versions de référence des bundles sensibles : `doctrine-bundle ^3.3`, `doctrin
 - Composer 2
 - Node.js ≥ 20 + npm
 - MySQL 8 (serveur local)
+- Docker (optionnel) : uniquement pour le [dev local Docker](#développement-local-avec-docker)
+  ou le [déploiement](#déploiement-docker-)
 
 ## Installation
 
@@ -136,40 +139,61 @@ auto-importés par PhpStorm dans les run configurations.
 > Note : l'interpréteur PHP local n'a pas xdebug chargé — pas de débogage pas-à-pas
 > via le serveur intégré.
 
-## Déploiement (Railway)
+## Développement local avec Docker
 
-Déploiement **sans Docker** : Railway construit le projet avec **Railpack**
-(détection automatique d'une application PHP via `composer.json` + `public/index.php`)
-puis le sert avec FrankenPHP.
+Une stack de développement isolée est fournie (`compose.yaml` + cible `standalone` du
+`Dockerfile`) : Symfony + MariaDB, sans rien installer dans votre système.
 
-```text
-GitHub → Railway (Railpack, no Docker) → Symfony 8.1 → MySQL externe (ex. Aiven)
+```bash
+docker compose up --build
+# app sur http://127.0.0.1:8080
 ```
 
-1. Poussez le dépôt sur GitHub.
-2. Sur Railway : *New Project → Deploy from GitHub repo* et choisissez le dépôt
-   (aucun `Dockerfile` requis — Railpack détecte PHP tout seul).
-3. Ajoutez les variables d'environnement listées plus bas.
-4. Déployez puis *Networking → Generate Domain*.
+Au premier démarrage : migrations + fixtures (**100 biens faker** + utilisateur admin)
+chargées automatiquement dans la base du conteneur `db`.
 
-Le build Railpack installe PHP, exécute `composer install`, puis (détection de
-`package.json`) installe les dépendances npm et lance le script `build` (Encore) —
-`public/build/` est donc généré à la volée, jamais commité. La variable
-`RAILPACK_PHP_ROOT_DIR=/app/public` fait servir `public/` comme racine web.
+- `LOAD_FIXTURES=auto` (défaut) : charge les fixtures uniquement si la table `property` est vide.
+  Passez `LOAD_FIXTURES=1` (toujours) ou `LOAD_FIXTURES=0` (jamais).
+- Arrêt : `docker compose down` (les données de `db` sont dans un volume, conservées).
+- Réinitialiser la base : `docker compose down -v && docker compose up --build`.
+- Mémoire du serveur intégré PHP partagée avec le style du runway local, mais aucun
+  `php`/`composer`/`node`/`mysql` n'est requis sur la machine hôte.
+
+## Déploiement (Docker)
+
+Déploiement **containerisé** : l'image de production est construite par `Dockerfile`
+(pas de Railpack/FrankenPHP) et peut être poussée et déployée sur **Railway**, **Render**
+ou toute plateforme qui exécute une image Docker.
+
+```text
+GitHub → Docker build → Railway/Render → image Symfony de production → MySQL externe (ex. Aiven)
+```
+
+Le `Dockerfile` est multi-stage et la **cible par défaut de `docker build .` est
+l'image de production** (le dernier stage, un alias vide, force `production`).
+
+### Image de production
+
+```bash
+docker build -t ma-super-agence .
+```
+
+Cette image contient uniquement Symfony en `APP_ENV=prod` : extensions PHP
+(`gd`, `intl`, `pdo_mysql`, `zip`, `mbstring`, `opcache`), vendor de production,
+assets frontend compilés, **aucune base de données embarquée** (pas de MySQL/MariaDB
+dans l'image) et aucun outil de build (node, composer).
 
 ### Démarrage et migrations
 
-Le fichier `start-container.sh` (racine du dépôt) est pris en compte par Railpack à la
-place de son script par défaut : il exécute
-`doctrine:migrations:migrate --no-interaction --allow-no-migration`, puis démarre
-FrankenPHP. Les migrations sont donc appliquées à chaque démarrage du service.
+L'entrypoint (`docker/docker-entrypoint.sh`) fait, à chaque démarrage du conteneur :
 
-> Les fixtures de démo (100 biens faker + utilisateur admin) sont en `require-dev` :
-> elles ne sont **pas** chargées en production. Pour créer un utilisateur admin sur
-> Railway, lancez une commande une fois : `railway run php bin/console doctrine:fixtures:load --env=prod`
-> (ou créez le compte manuellement en base).
+1. **Refuse une base "locale"** : `DATABASE_URL` doit pointer vers un MySQL externe —
+   les URL `@localhost` / `@127.0.0.1` sont bloquées en production.
+2. Attend que la base soit joignable (jusqu'à `DB_TIMEOUT=60` s).
+3. Applique `doctrine:migrations:migrate --allow-no-migration`.
+4. Démarre Symfony : `php -S 0.0.0.0:$PORT -t public public/router.php`.
 
-### Variables d'environnement (à définir sur Railway)
+### Variables d'environnement (cloud)
 
 | Variable | Valeur à renseigner |
 |---|---|
@@ -178,25 +202,28 @@ FrankenPHP. Les migrations sont donc appliquées à chaque démarrage du service
 | `APP_SECRET` | une chaîne aléatoire (`php -r 'echo bin2hex(random_bytes(32)), PHP_EOL;'`) |
 | `DATABASE_URL` | URL du MySQL externe (ex. Aiven) — cf. `.env.example` |
 | `MAILER_DSN` | `null://null` en attendant, ou un DSN SMTP |
-| `RAILPACK_PHP_ROOT_DIR` | `/app/public` |
-| `COMPOSER_ALLOW_SUPERUSER` | `1` |
-| `PORT` | injecté automatiquement par Railway (ne rien définir) |
+| `PORT` | injecté automatiquement par Railway/Render |
 
-Aucun secret dans Git : ces variables se configurent dans l'onglet *Variables* du
-service Railway, pas dans un fichier.
+Les variables cloud priment sur le `.env` commité (qui est embarqué dans l'image car
+requis par le boot Symfony) — aucun secret dans Git.
+
+> Les fixtures de démo (100 biens faker + utilisateur admin) sont en `require-dev` :
+> elles ne sont **pas** présentes dans l'image de production. Pour créer un utilisateur
+> admin, lancez une fois : `docker exec <conteneur> php bin/console doctrine:fixtures:load --env=prod`
+> (ou créez le compte manuellement en base).
 
 ### Base de données
 
-Le projet reste sur **MySQL**. Railway ne fournit que du Postgres managé → utilisez un
-MySQL externe (ex. Aiven, gratuit) et renseignez son `DATABASE_URL`
-(`mysql://user:pass@host:3306/ma_super_agence`). Ne migrez pas vers PostgreSQL :
+Le projet reste sur **MySQL/MariaDB**. Railway ne fournit pas de MySQL managé → utilisez
+un MySQL externe (ex. Aiven, gratuit) et renseignez son `DATABASE_URL`
+(`mysql://user:pass@host:3306/ma_super_agence`). Ne portez pas vers PostgreSQL :
 les migrations et les requêtes `MEMBER OF` sont spécifiques à MySQL.
 
 ### Images
 
 L'affichage public utilise des images externes **Lorem Picsum**
 (`Property::getImageUrl()`) — aucun stockage de fichiers requis. Les uploads Vich du
-back-office reposent sur le filesystem éphémère du conteneur Railway (perdus à chaque
+back-office reposent sur le filesystem éphémère du conteneur (perdus à chaque
 redéploiement), sans impact sur la vitrine.
 
 ## Tests
@@ -246,9 +273,11 @@ src/
 └── Repository/            # PropertyRepository (visible/search/filter queries)
 templates/                 # base + admin/, emails/, pages/, property/, security/
 assets/                    # js/app.js + css/app.css (Encore entry 'app')
+docker/                    # entrypoint de prod/dev + php/prod.ini
 public/                    # index.php, router.php, build/, assets/images/properties/
 config/                    # bundles, packages/{dev,prod,test}, routes
-start-container.sh         # démarrage Railway (migrations puis FrankenPHP)
+Dockerfile                 # image multi-stage — cible par défaut = production
+compose.yaml               # dev local : app (standalone) + service db (mariadb)
 translations/              # forms.fr.yaml, KnpPaginatorBundle.fr.yml
 ```
 
