@@ -141,7 +141,13 @@ Admin credentials after fixtures: **`demo` / `demo`**.
 
 - Multi-stage `Dockerfile`: stage `composer-deps` (`php:8.5-cli`, `composer install --no-dev`
   + `--classmap-authoritative`), stage `assets` (`node:20-alpine`, `npm ci && npm run build`
-  → `public/build`, which is **gitignored**), stage `runtime` (`php:8.5-cli`, `USER app`).
+  → `public/build`, which is **gitignored**), stage `runtime` (`php:8.5-cli`, `USER app`),
+  stage `standalone` (conteneur unique, `compose.yaml` only).
+- **Cible par défaut = `runtime`** : le dernier stage du Dockerfile est `FROM runtime`
+  (stage alias vide). Render ne supporte pas `--target`, donc un `docker build .` nu doit
+  produire l'image de production — jamais le conteneur unique `standalone` (sinon MariaDB
+  tourne dans le conteneur Render et `DATABASE_URL` non défini retombe sur le `.env` dev
+  → `Access denied for user 'root'@'localhost'`, boucle de crash).
 - Extensions compiled in both PHP stages: `gd --with-freetype --with-jpeg --with-webp`,
   `intl`, `mbstring`, `pdo_mysql`, `exif`, `opcache` (+ `zip` in the composer stage only).
 - Runtime php.ini: `docker/php/prod.ini` (opcache with `enable_cli=1` — required for `php -S`).
@@ -150,7 +156,9 @@ Admin credentials after fixtures: **`demo` / `demo`**.
   (`PORT` defaults to 8080; Render injects `$PORT`). The router.php SCRIPT_FILENAME gotcha
   still applies — never replace it.
 - `.dockerignore` excludes `vendor`, `node_modules`, `var`, `public/build`, `public/media/cache`,
-  `tests`, uploaded images, and all `.env*` except `.env.example`.
+  `tests`, uploaded images, and all `.env*` except `.env.example`. Le `.env` commité (défauts dev)
+  reste DANS l'image : sans `/app/.env`, Symfony 8.1 ne boote pas (Dotenv `PathException`). Les
+  variables d'environnement réelles (Render/Compose) priment toujours dessus.
 - `.env.example` (committed) is the prod env reference: `APP_ENV`, `APP_DEBUG`, `APP_SECRET`,
   `DATABASE_URL`, `MAILER_DSN`, `PORT`.
 - **DB on Render**: stays MySQL. Render has no managed MySQL → use an external MySQL
@@ -168,8 +176,9 @@ Admin credentials after fixtures: **`demo` / `demo`**.
   `docker/docker-entrypoint-standalone.sh`: starts `mariadbd`, creates DB/user (`app`/`app`,
   `MYSQL_*` env overridable), runs migrations, then **fixtures under `--env=test`** (the fixtures
   bundle is `dev`/`test`-only in `config/bundles.php`, hence not the prod env) when `LOAD_FIXTURES`
-  is `auto`+empty DB / `1`, and `exec php -S`. Data persists in the `db_data` volume. Runs as root
-  (mysqld + PHP in one container); prod stays on `runtime` + external MySQL.
+  is `auto`+empty DB / `1`, and `exec php -S`. Sans `DATABASE_URL` explicite l'entrypoint pose
+  `mysql://app:app@127.0.0.1:3306/$MYSQL_DATABASE` (jamais le `.env` dev). Data persists in the
+  `db_data` volume. Runs as root (mysqld + PHP in one container); prod stays on `runtime` + external MySQL.
 
 ## Environment & configuration
 

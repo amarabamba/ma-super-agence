@@ -11,6 +11,12 @@ MYSQL_DATABASE=${MYSQL_DATABASE:-masuperagence}
 MYSQL_USER=${MYSQL_USER:-app}
 MYSQL_PASSWORD=${MYSQL_PASSWORD:-app}
 
+# Sans DATABASE_URL explicite, on se branche sur le MySQL du conteneur avec le
+# compte applicatif créé ci-dessous — jamais sur le .env dev (root@127.0.0.1).
+if [ -z "${DATABASE_URL:-}" ]; then
+    export DATABASE_URL="mysql://$MYSQL_USER:$MYSQL_PASSWORD@127.0.0.1:3306/$MYSQL_DATABASE"
+fi
+
 mkdir -p /run/mysqld
 chown mysql:mysql /run/mysqld
 

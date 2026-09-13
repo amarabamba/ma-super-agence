@@ -142,6 +142,11 @@ Le dépôt contient un `Dockerfile` multi-stage conçu pour Render (ou tout hôt
 installation Composer **sans** deps de dev, build Encore, puis image d'exécution légère
 qui lance `php -S 0.0.0.0:$PORT -t public public/router.php`.
 
+> **Cible par défaut = production.** Le dernier stage du `Dockerfile` est un alias vers
+> le stage `runtime`. Render (et tout `docker build .` nu) ne construit pas les `--target` :
+> sans intervention, on obtient donc l'image de prod (base MySQL **externe**), pas le
+> conteneur unique `standalone` (voir plus bas).
+
 ### Construire et tester localement
 
 ```bash
@@ -182,13 +187,19 @@ Réglages utiles (`compose.yaml`) :
 - `DATABASE_URL`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD` : connexion interne
   (`127.0.0.1:3306` dans le conteneur) — rien d'externe à installer.
 
-> Ce mode est réservé au dev/démo local. En production (Render) on garde le stage `runtime`
-> du `Dockerfile` avec une base MySQL externe.
+> Ce mode est réservé au dev/démo local : il faut passer explicitement `target: standalone`
+> (`compose.yaml` le fait). En production (Render) le `docker build` par défaut produit le
+> stage `runtime` avec une base MySQL externe.
 
 ### Variables d'environnement (à définir sur l'hébergeur)
 
 `APP_ENV=prod`, `APP_DEBUG=0`, `APP_SECRET` (secret aléatoire, jamais en clair dans Git),
 `DATABASE_URL`, `MAILER_DSN`, et `PORT` (injecté automatiquement par Render).
+
+> ⚠ Définis **toutes** ces variables sur Render. L'image contient un `.env` de dev
+> (obligatoire pour que Symfony 8.1 boote — `Dotenv\PathException` sinon) : sans
+> `DATABASE_URL` explicite, le conteneur retombe sur `mysql://root:@127.0.0.1:3306/...`
+> → `Access denied for user 'root'@'localhost'` et boucle de crash (cas réel rencontré).
 
 ### Base de données sur Render
 

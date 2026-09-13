@@ -3,7 +3,13 @@
 # Multi-stage build for Render (and any Docker host).
 #  - composer-deps: PHP deps (no dev) + production cache
 #  - assets:        Encore assets (public/build)
-#  - runtime:       slim PHP image running  php -S 0.0.0.0:$PORT -t public public/router.php
+#  - runtime:       production PHP image (MySQL externe, entrypoint migrations)
+#  - standalone:    conteneur unique dev (app + MariaDB) — cible de compose.yaml
+#
+# ⚠ Le dernier stage du Dockerfile = cible par défaut de `docker build .`.
+#   Render ne supporte pas `--target`. La cible par défaut doit donc être la
+#   production (runtime), pas le conteneur unique. On re-sélectionne `runtime`
+#   comme étape finale. Pour le conteneur unique, passée `--target standalone`.
 
 #########################
 # Stage 1: PHP + Composer
@@ -138,3 +144,12 @@ ENV MYSQL_DATABASE=masuperagence \
     LOAD_FIXTURES=auto
 
 ENTRYPOINT ["docker-entrypoint-standalone"]
+
+#########################
+# Stage final (défaut) : production Render
+#########################
+# Le dernier stage d'un Dockerfile est la cible construite par défaut.
+# Render ne compile pas les --target, donc `docker build .` doit produire
+# l'image de production (runtime, MySQL externe) et non le conteneur unique.
+# Ce stage vide redirige la cible par défaut vers `runtime`.
+FROM runtime

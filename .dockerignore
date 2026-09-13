@@ -20,8 +20,9 @@ config/reference.php
 tests
 
 # Secrets: never copy local environment overrides.
-# .env (committed dev defaults) is kept: Symfony's Dotenv requires it to exist,
-# and real environment variables (Render) always win over it.
+# .env (committed dev defaults) MUST stay: Symfony 8.1 throws a Dotenv
+# PathException if /app/.env is absent (bootEnv fails hard, the app won't boot).
+# Real environment variables (Render/Compose) always win over it.
 .env.*
 !.env.example
 
