@@ -2,132 +2,96 @@
 
 namespace App\Entity;
 
+use App\Repository\PropertyRepository;
+use Cocur\Slugify\Slugify;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
-use Cocur\Slugify\Slugify;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\HttpFoundation\File\File;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\Validator\Constraints as Assert;
-use Vich\UploaderBundle\Mapping\Annotation as Vich;
+use Vich\UploaderBundle\Mapping\Attribute as Vich;
 
-
-/**
- * @ORM\Entity(repositoryClass="App\Repository\PropertyRepository")
- * @UniqueEntity("title")
- * @Vich\Uploadable()
- */
+#[ORM\Entity(repositoryClass: PropertyRepository::class)]
+#[ORM\Table(name: 'property')]
+#[UniqueEntity(fields: ['title'])]
+#[Vich\Uploadable]
 class Property
 {
-
-    const HEAT = [
+    public const HEAT = [
         0 => 'Electrique',
-        1 => 'Gaz'
+        1 => 'Gaz',
     ];
 
-    /**
-     * @ORM\Id()
-     * @ORM\GeneratedValue()
-     * @ORM\Column(type="integer")
-     */
-    private $id;
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
+    private ?int $id = null;
+
+    #[ORM\Column(type: 'string', length: 255)]
+    private ?string $filename = null;
+
+    #[Assert\Image(mimeTypes: ['image/jpeg'])]
+    #[Vich\UploadableField(mapping: 'property_image', fileNameProperty: 'filename')]
+    private ?File $imageFile = null;
+
+    #[Assert\Length(min: 5, max: 225)]
+    #[ORM\Column(type: 'string', length: 255)]
+    private ?string $title = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $description = null;
+
+    #[Assert\Range(min: 10, max: 400)]
+    #[ORM\Column(type: 'integer')]
+    private ?int $surface = null;
+
+    #[ORM\Column(type: 'integer')]
+    private ?int $rooms = null;
+
+    #[ORM\Column(type: 'integer')]
+    private ?int $bedrooms = null;
+
+    #[ORM\Column(type: 'integer')]
+    private ?int $floor = null;
+
+    #[ORM\Column(type: 'integer')]
+    private ?int $price = null;
+
+    #[ORM\Column(type: 'integer')]
+    private ?int $heat = null;
+
+    #[ORM\Column(type: 'string', length: 255)]
+    private ?string $city = null;
+
+    #[ORM\Column(type: 'string', length: 255)]
+    private ?string $address = null;
+
+    #[Assert\Regex('/^[0-9]{5}$/')]
+    #[ORM\Column(type: 'string', length: 255)]
+    private ?string $postal_code = null;
+
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $sold = false;
+
+    #[ORM\Column(type: 'datetime')]
+    private ?\DateTimeInterface $created_at = null;
+
+    #[ORM\Column(type: 'datetime')]
+    private ?\DateTimeInterface $updated_at = null;
 
     /**
-     * @var string | null
-     * @ORM\Column(type="string", length=255)
+     * @var Collection<int, Option>
      */
-    private $filename;
+    #[ORM\ManyToMany(targetEntity: Option::class, inversedBy: 'properties')]
+    private Collection $options;
 
-    /**
-     * @var File | null
-     * @Assert\Image(
-     *     mimeTypes="image/jpeg"
-     * )
-     * @Vich\UploadableField(mapping="property_image", fileNameProperty="filename")
-     */
-    private $imageFile;
-
-    /**
-     * @Assert\Length(min=5 , max=225)
-     * @ORM\Column(type="string", length=255)
-     */
-    private $title;
-
-    /**
-     * @ORM\Column(type="text", nullable=true)
-     */
-    private $description;
-
-    /**
-     * @ORM\Column(type="integer")
-     * @Assert\Range(min=10, max=400)
-     */
-    private $surface;
-
-    /**
-     * @ORM\Column(type="integer")
-     */
-    private $rooms;
-
-    /**
-     * @ORM\Column(type="integer")
-     */
-    private $bedrooms;
-
-    /**
-     * @ORM\Column(type="integer")
-     */
-    private $floor;
-
-    /**
-     * @ORM\Column(type="integer")
-     */
-    private $price;
-
-    /**
-     * @ORM\Column(type="integer")
-     */
-    private $heat;
-
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
-    private $city;
-
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
-    private $address;
-
-    /**
-     * @Assert\Regex("/^[0-9]{5}$/")
-     * @ORM\Column(type="string", length=255)
-     */
-    private $postal_code;
-
-    /**
-     * @ORM\Column(type="boolean", options={"default": false})
-     */
-    private $sold = false;
-
-    /**
-     * @ORM\Column(type="datetime")
-     */
-    private $created_at;
-
-    /**
-     * @ORM\ManyToMany(targetEntity="App\Entity\Option", inversedBy="properties")
-     */
-    private $options;
-
-    /**
-     * @ORM\Column(type="datetime")
-     */
-    private $updated_at;
     public function __construct()
     {
         $this->created_at = new \DateTime();
+        $this->updated_at = new \DateTime();
+        $this->filename = '';
         $this->options = new ArrayCollection();
     }
 
@@ -150,7 +114,7 @@ class Property
 
     public function getSlug(): string
     {
-        return (new Slugify())->slugify($this->title);
+        return (new Slugify())->slugify((string) $this->title);
     }
 
     public function getDescription(): ?string
@@ -227,7 +191,7 @@ class Property
 
     public function getFormattedPrice(): string
     {
-        return number_format($this->price, 0,'',' ');
+        return number_format((int) $this->price, 0, '', ' ');
     }
 
     public function getHeat(): ?int
@@ -242,7 +206,7 @@ class Property
         return $this;
     }
 
-    public function getHeatType():  string
+    public function getHeatType(): string
     {
         return self::HEAT[$this->heat];
     }
@@ -308,7 +272,7 @@ class Property
     }
 
     /**
-     * @return Collection|Option[]
+     * @return Collection<int, Option>
      */
     public function getOptions(): Collection
     {
@@ -335,43 +299,31 @@ class Property
         return $this;
     }
 
-    /**
-     * @return string|null
-     */
-    public function getFilename () : ?string
+    public function getFilename(): ?string
     {
-        return $this -> filename;
+        return $this->filename;
     }
 
-    /**
-     * @param string|null $filename
-     * @return Property
-     */
-    public function setFilename ( ?string $filename ) : Property
+    public function setFilename(?string $filename): Property
     {
-        $this -> filename = $filename;
+        $this->filename = $filename;
+
         return $this;
     }
 
-    /**
-     * @return File|null
-     */
-    public function getImageFile () : ?File
+    public function getImageFile(): ?File
     {
-        return $this -> imageFile;
+        return $this->imageFile;
     }
 
-    /**
-     * @param File|null $imageFile
-     * @return Property
-     * @throws \Exception
-     */
-    public function setImageFile ( ?File $imageFile ) : Property
+    public function setImageFile(?File $imageFile): Property
     {
-        $this -> imageFile = $imageFile;
-        if ($this->imageFile instanceof UploadedFile){
+        $this->imageFile = $imageFile;
+
+        if ($this->imageFile instanceof UploadedFile) {
             $this->updated_at = new \DateTime('now');
         }
+
         return $this;
     }
 
@@ -386,6 +338,4 @@ class Property
 
         return $this;
     }
-
-
 }

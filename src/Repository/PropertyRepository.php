@@ -5,15 +5,12 @@ namespace App\Repository;
 use App\Entity\Property;
 use App\Entity\PropertySearch;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
-use Doctrine\Common\Persistence\ManagerRegistry;
+use Doctrine\Persistence\ManagerRegistry;
 use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
 
 /**
- * @method Property|null find($id, $lockMode = null, $lockVersion = null)
- * @method Property|null findOneBy(array $criteria, array $orderBy = null)
- * @method Property[]    findAll()
- * @method Property[]    findBy(array $criteria, array $orderBy = null, $limit = null, $offset = null)
+ * @extends ServiceEntityRepository<Property>
  */
 class PropertyRepository extends ServiceEntityRepository
 {
@@ -22,34 +19,29 @@ class PropertyRepository extends ServiceEntityRepository
         parent::__construct($registry, Property::class);
     }
 
-    /**
-     * @param PropertySearch $search
-     * @return Query
-     */
     public function findAllVisibleQuery(PropertySearch $search): Query
     {
         $query = $this->findVisibleQuery();
 
-        if ($search->getMaxPrice()){
+        if ($search->getMaxPrice()) {
             $query = $query
                 ->andWhere('p.price <= :maxprice')
                 ->setParameter('maxprice', $search->getMaxPrice());
         }
 
-        if ($search->getMinSurface()){
+        if ($search->getMinSurface()) {
             $query = $query
-                ->andWhere('p.surface >= :minsufarce')
-                ->setParameter('minsufarce', $search->getMinSurface());
+                ->andWhere('p.surface >= :minsurface')
+                ->setParameter('minsurface', $search->getMinSurface());
         }
 
-        if ($search->getOptions()->count() > 0){
+        if ($search->getOptions()->count() > 0) {
             $k = 0;
-            foreach ($search->getOptions() as $option){
-                $k++;
-                $query =$query
+            foreach ($search->getOptions() as $option) {
+                ++$k;
+                $query = $query
                     ->andWhere(":option$k MEMBER OF p.options")
-                    ->setParameter("option$k", $option)
-                ;
+                    ->setParameter("option$k", $option);
             }
         }
 
@@ -64,43 +56,12 @@ class PropertyRepository extends ServiceEntityRepository
         return $this->findVisibleQuery()
             ->setMaxResults(4)
             ->getQuery()
-            ->getResult()
-        ;
+            ->getResult();
     }
 
-    private function findVisibleQuery (): QueryBuilder
+    private function findVisibleQuery(): QueryBuilder
     {
         return $this->createQueryBuilder('p')
-            ->where('p.sold = false')
-        ;
+            ->where('p.sold = false');
     }
-
-    // /**
-    //  * @return Property[] Returns an array of Property objects
-    //  */
-    /*
-    public function findByExampleField($value)
-    {
-        return $this->createQueryBuilder('p')
-            ->andWhere('p.exampleField = :val')
-            ->setParameter('val', $value)
-            ->orderBy('p.id', 'ASC')
-            ->setMaxResults(10)
-            ->getQuery()
-            ->getResult()
-        ;
-    }
-    */
-
-    /*
-    public function findOneBySomeField($value): ?Property
-    {
-        return $this->createQueryBuilder('p')
-            ->andWhere('p.exampleField = :val')
-            ->setParameter('val', $value)
-            ->getQuery()
-            ->getOneOrNullResult()
-        ;
-    }
-    */
 }

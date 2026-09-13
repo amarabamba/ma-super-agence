@@ -1,57 +1,56 @@
 <?php
+
 namespace App\Controller\Listener;
 
 use App\Entity\Property;
-use Doctrine\Common\EventSubscriber;
-use Doctrine\ORM\Event\LifecycleEventArgs;
-use Doctrine\ORM\Event\PreFlushEventArgs;
+use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
+use Doctrine\ORM\Event\PreRemoveEventArgs;
 use Doctrine\ORM\Event\PreUpdateEventArgs;
-use Doctrine\ORM\Mapping\PreUpdate;
+use Doctrine\ORM\Events;
 use Liip\ImagineBundle\Imagine\Cache\CacheManager;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
-use Vich\UploaderBundle\Templating\Helper\UploaderHelper;
+use Vich\UploaderBundle\Storage\StorageInterface;
 
-class ImageCacheSubscriber implements EventSubscriber {
-
-    /**
-     * @var CacheManager
-     */
-    private $cacheManager;
-
-    /**
-     * @var UploaderHelper
-     */
-    private $uploaderHelper;
-
-    public function __construct ( CacheManager $cacheManager, UploaderHelper $uploaderHelper)
-    {
-        $this -> cacheManager = $cacheManager;
-        $this -> uploaderHelper = $uploaderHelper;
+#[AsDoctrineListener(event: Events::preRemove)]
+#[AsDoctrineListener(event: Events::preUpdate)]
+class ImageCacheSubscriber
+{
+    public function __construct(
+        private readonly CacheManager $cacheManager,
+        private readonly StorageInterface $storage,
+    ) {
     }
 
-    public function getSubscribedEvents ()
+    public function preRemove(PreRemoveEventArgs $args): void
     {
-        return [
-            'preRemove',
-            'preUpdate'
-        ];
-    }
+        $entity = $args->getObject();
 
-    public function preRemove (LifecycleEventArgs $args) {
-        $entity = $args->getEntity();
-        if($entity instanceof  Property) {
+        if (!$entity instanceof Property) {
             return;
         }
-        $this->cacheManager->remove($this->uploaderHelper->asset($entity, 'imageFile'));
+
+        $this->removeCachedImages($entity);
     }
 
-    public function preUpdate (PreUpdateEventArgs $args) {
-        $entity = $args->getEntity();
-        if($entity instanceof  Property) {
+    public function preUpdate(PreUpdateEventArgs $args): void
+    {
+        $entity = $args->getObject();
+
+        if (!$entity instanceof Property) {
             return;
         }
-        if($entity->getImageFile() instanceof  UploadedFile) {
-            $this->cacheManager->remove($this->uploaderHelper->asset($entity, 'imageFile'));
+
+        if ($entity->getImageFile() instanceof UploadedFile) {
+            $this->removeCachedImages($entity);
+        }
+    }
+
+    private function removeCachedImages(Property $property): void
+    {
+        $uri = $this->storage->resolveUri($property, 'imageFile');
+
+        if ($uri) {
+            $this->cacheManager->remove($uri);
         }
     }
 }

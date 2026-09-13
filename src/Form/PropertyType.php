@@ -13,7 +13,7 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class PropertyType extends AbstractType
 {
-    public function buildForm(FormBuilderInterface $builder, array $options)
+    public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
             ->add('title')
@@ -24,40 +24,41 @@ class PropertyType extends AbstractType
             ->add('floor')
             ->add('price')
             ->add('heat', ChoiceType::class, [
-                'choices' => $this->getChoices()
+                'choices' => $this->getChoices(),
             ])
             ->add('options', EntityType::class, [
                 'class' => Option::class,
                 'required' => false,
                 'choice_label' => 'name',
-                'multiple' => true
+                'multiple' => true,
             ])
             ->add('city')
             ->add('address')
             ->add('postal_code')
             ->add('sold')
             ->add('imageFile', FileType::class, [
-                'required' => false
-            ])
-        ;
+                'required' => false,
+            ]);
     }
 
-    public function configureOptions(OptionsResolver $resolver)
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
             'data_class' => Property::class,
-            'translattion_domain' => 'forms'
+            'translation_domain' => 'forms',
         ]);
     }
 
-    public function getChoices()
+    /**
+     * @return array<string, int>
+     */
+    public function getChoices(): array
     {
-        $choices = Property::HEAT;
-        $oupout = [];
-        foreach($choices as $k => $v )
-        {
-            $oupout[$v] = $k;
+        $output = [];
+        foreach (Property::HEAT as $k => $v) {
+            $output[$v] = $k;
         }
-        return $oupout;
+
+        return $output;
     }
 }

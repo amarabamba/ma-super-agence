@@ -2,31 +2,28 @@
 
 namespace App\Entity;
 
+use App\Repository\OptionRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass="App\Repository\OptionRepository")
- */
+#[ORM\Entity(repositoryClass: OptionRepository::class)]
+#[ORM\Table(name: '`option`')]
 class Option
 {
-    /**
-     * @ORM\Id()
-     * @ORM\GeneratedValue()
-     * @ORM\Column(type="integer")
-     */
-    private $id;
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
+    private ?int $id = null;
+
+    #[ORM\Column(type: 'string', length: 255)]
+    private ?string $name = null;
 
     /**
-     * @ORM\Column(type="string", length=255)
+     * @var Collection<int, Property>
      */
-    private $name;
-
-    /**
-     * @ORM\ManyToMany(targetEntity="App\Entity\Property", mappedBy="options")
-     */
-    private $properties;
+    #[ORM\ManyToMany(targetEntity: Property::class, mappedBy: 'options')]
+    private Collection $properties;
 
     public function __construct()
     {
@@ -51,7 +48,7 @@ class Option
     }
 
     /**
-     * @return Collection|Property[]
+     * @return Collection<int, Property>
      */
     public function getProperties(): Collection
     {
