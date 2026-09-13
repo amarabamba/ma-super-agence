@@ -137,6 +137,40 @@ vendor/bin/phpunit
 
 Admin credentials after fixtures: **`demo` / `demo`**.
 
+## Deployment (Docker / Render)
+
+- Multi-stage `Dockerfile`: stage `composer-deps` (`php:8.5-cli`, `composer install --no-dev`
+  + `--classmap-authoritative`), stage `assets` (`node:20-alpine`, `npm ci && npm run build`
+  → `public/build`, which is **gitignored**), stage `runtime` (`php:8.5-cli`, `USER app`).
+- Extensions compiled in both PHP stages: `gd --with-freetype --with-jpeg --with-webp`,
+  `intl`, `mbstring`, `pdo_mysql`, `exif`, `opcache` (+ `zip` in the composer stage only).
+- Runtime php.ini: `docker/php/prod.ini` (opcache with `enable_cli=1` — required for `php -S`).
+- Entrypoint `docker/docker-entrypoint.sh`: runs `doctrine:migrations:migrate --no-interaction
+  --allow-no-migration`, then `exec php -S 0.0.0.0:${PORT} -t public public/router.php`
+  (`PORT` defaults to 8080; Render injects `$PORT`). The router.php SCRIPT_FILENAME gotcha
+  still applies — never replace it.
+- `.dockerignore` excludes `vendor`, `node_modules`, `var`, `public/build`, `public/media/cache`,
+  `tests`, uploaded images, and all `.env*` except `.env.example`.
+- `.env.example` (committed) is the prod env reference: `APP_ENV`, `APP_DEBUG`, `APP_SECRET`,
+  `DATABASE_URL`, `MAILER_DSN`, `PORT`.
+- **DB on Render**: stays MySQL. Render has no managed MySQL → use an external MySQL
+  (Clever Cloud, TiDB Cloud Serverless, Aiven). Do **not** port to Render Postgres
+  (migrations `abortIf(... !== 'mysql')`, `MEMBER OF` query).
+- **Vich uploads** keep working in admin but the container FS is ephemeral — uploads are lost
+  on redeploy/restart. Public display uses Lorem Picsum (`Property::getImageUrl()`), so the
+  vitrine is unaffected. Do not add S3 without an explicit request.
+- Local Docker test: `docker build -t masuperagence:test .` then run with `-p 8080:8080 -e PORT=8080
+  -e APP_ENV=prod -e APP_DEBUG=0 -e APP_SECRET=... -e DATABASE_URL=mysql://root:@host.docker.internal:3306/masuperagence
+  -e MAILER_DSN=null://null`.
+- **Single-container dev** (`compose.yaml`, build target `standalone`): a 4th Dockerfile stage on top of
+  `runtime` that installs MariaDB 11 (drop-in for MySQL 8 here: Doctrine platform `mysql`, utf8mb4,
+  `MEMBER OF`) + dev composer deps (DoctrineFixturesBundle/Faker) and runs
+  `docker/docker-entrypoint-standalone.sh`: starts `mariadbd`, creates DB/user (`app`/`app`,
+  `MYSQL_*` env overridable), runs migrations, then **fixtures under `--env=test`** (the fixtures
+  bundle is `dev`/`test`-only in `config/bundles.php`, hence not the prod env) when `LOAD_FIXTURES`
+  is `auto`+empty DB / `1`, and `exec php -S`. Data persists in the `db_data` volume. Runs as root
+  (mysqld + PHP in one container); prod stays on `runtime` + external MySQL.
+
 ## Environment & configuration
 
 - `.env` is **committed** (it only holds dev defaults). Secret/local overrides go to `.env.local` (gitignored).
