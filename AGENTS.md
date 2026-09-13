@@ -137,6 +137,27 @@ vendor/bin/phpunit
 
 Admin credentials after fixtures: **`demo` / `demo`**.
 
+## Deployment (Railway — no Docker)
+
+- Railway builds with **Railpack** (auto-detects PHP via `composer.json` + `public/index.php`,
+  serves via FrankenPHP). No Dockerfile. `public/router.php` is only for local `php -S`.
+- Build runs `composer install`, then since `package.json` exists: npm install + the `build`
+  script (Encore) → `public/build/` generated in the image (still gitignored).
+- `RAILPACK_PHP_ROOT_DIR=/app/public` env var is **required** (Railpack only defaults to
+  `public/` for Laravel).
+- PHP extensions Railpack installs are declared in `composer.json` `require`:
+  `ext-pdo_mysql`, `ext-gd`, `ext-intl`, `ext-mbstring` (all verified locally too).
+- `start-container.sh` (repo root) overrides Railpack's default start script: runs
+  `doctrine:migrations:migrate --no-interaction --allow-no-migration`, then starts FrankenPHP:
+  `docker-php-entrypoint --config /Caddyfile --adapter caddyfile`. Migrations only run at boot.
+- DB stays external MySQL (e.g. Aiven). Railway has no managed MySQL — do **not** port to
+  Postgres (migrations `instanceof AbstractMySQLPlatform` guards, `MEMBER OF` query).
+- Railway env vars: `APP_ENV=prod`, `APP_DEBUG=0`, `APP_SECRET`, `DATABASE_URL`,
+  `MAILER_DSN`, `RAILPACK_PHP_ROOT_DIR`, `COMPOSER_ALLOW_SUPERUSER=1`. `PORT` is injected.
+- Fixtures are dev-only → **not loaded in prod**; there is no `demo` user on Railway.
+- Public images use Lorem Picsum (`Property::getImageUrl()`) — no file storage needed.
+  Vich admin uploads go to the ephemeral container FS (lost on redeploy). No S3.
+
 ## Environment & configuration
 
 - `.env` is **committed** (it only holds dev defaults). Secret/local overrides go to `.env.local` (gitignored).

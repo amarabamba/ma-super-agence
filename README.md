@@ -18,6 +18,7 @@ Projet personnel d'apprentissage Symfony, initialement construit en suivant le t
 - [Configuration de l'environnement](#configuration-de-lenvironnement)
 - [Base de données](#base-de-données)
 - [Lancement en local](#lancement-en-local)
+- [Déploiement (Railway)](#déploiement-railway-)
 - [Tests](#tests)
 - [Commandes utiles](#commandes-utiles)
 - [Structure du projet](#structure-du-projet)
@@ -135,6 +136,69 @@ auto-importés par PhpStorm dans les run configurations.
 > Note : l'interpréteur PHP local n'a pas xdebug chargé — pas de débogage pas-à-pas
 > via le serveur intégré.
 
+## Déploiement (Railway)
+
+Déploiement **sans Docker** : Railway construit le projet avec **Railpack**
+(détection automatique d'une application PHP via `composer.json` + `public/index.php`)
+puis le sert avec FrankenPHP.
+
+```text
+GitHub → Railway (Railpack, no Docker) → Symfony 8.1 → MySQL externe (ex. Aiven)
+```
+
+1. Poussez le dépôt sur GitHub.
+2. Sur Railway : *New Project → Deploy from GitHub repo* et choisissez le dépôt
+   (aucun `Dockerfile` requis — Railpack détecte PHP tout seul).
+3. Ajoutez les variables d'environnement listées plus bas.
+4. Déployez puis *Networking → Generate Domain*.
+
+Le build Railpack installe PHP, exécute `composer install`, puis (détection de
+`package.json`) installe les dépendances npm et lance le script `build` (Encore) —
+`public/build/` est donc généré à la volée, jamais commité. La variable
+`RAILPACK_PHP_ROOT_DIR=/app/public` fait servir `public/` comme racine web.
+
+### Démarrage et migrations
+
+Le fichier `start-container.sh` (racine du dépôt) est pris en compte par Railpack à la
+place de son script par défaut : il exécute
+`doctrine:migrations:migrate --no-interaction --allow-no-migration`, puis démarre
+FrankenPHP. Les migrations sont donc appliquées à chaque démarrage du service.
+
+> Les fixtures de démo (100 biens faker + utilisateur admin) sont en `require-dev` :
+> elles ne sont **pas** chargées en production. Pour créer un utilisateur admin sur
+> Railway, lancez une commande une fois : `railway run php bin/console doctrine:fixtures:load --env=prod`
+> (ou créez le compte manuellement en base).
+
+### Variables d'environnement (à définir sur Railway)
+
+| Variable | Valeur à renseigner |
+|---|---|
+| `APP_ENV` | `prod` |
+| `APP_DEBUG` | `0` |
+| `APP_SECRET` | une chaîne aléatoire (`php -r 'echo bin2hex(random_bytes(32)), PHP_EOL;'`) |
+| `DATABASE_URL` | URL du MySQL externe (ex. Aiven) — cf. `.env.example` |
+| `MAILER_DSN` | `null://null` en attendant, ou un DSN SMTP |
+| `RAILPACK_PHP_ROOT_DIR` | `/app/public` |
+| `COMPOSER_ALLOW_SUPERUSER` | `1` |
+| `PORT` | injecté automatiquement par Railway (ne rien définir) |
+
+Aucun secret dans Git : ces variables se configurent dans l'onglet *Variables* du
+service Railway, pas dans un fichier.
+
+### Base de données
+
+Le projet reste sur **MySQL**. Railway ne fournit que du Postgres managé → utilisez un
+MySQL externe (ex. Aiven, gratuit) et renseignez son `DATABASE_URL`
+(`mysql://user:pass@host:3306/ma_super_agence`). Ne migrez pas vers PostgreSQL :
+les migrations et les requêtes `MEMBER OF` sont spécifiques à MySQL.
+
+### Images
+
+L'affichage public utilise des images externes **Lorem Picsum**
+(`Property::getImageUrl()`) — aucun stockage de fichiers requis. Les uploads Vich du
+back-office reposent sur le filesystem éphémère du conteneur Railway (perdus à chaque
+redéploiement), sans impact sur la vitrine.
+
 ## Tests
 
 Aucun test pour l'instant (`tests/` est vide et il n'y a pas de `phpunit.xml.dist`).
@@ -184,6 +248,7 @@ templates/                 # base + admin/, emails/, pages/, property/, security
 assets/                    # js/app.js + css/app.css (Encore entry 'app')
 public/                    # index.php, router.php, build/, assets/images/properties/
 config/                    # bundles, packages/{dev,prod,test}, routes
+start-container.sh         # démarrage Railway (migrations puis FrankenPHP)
 translations/              # forms.fr.yaml, KnpPaginatorBundle.fr.yml
 ```
 
