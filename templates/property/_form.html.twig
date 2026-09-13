@@ -1,13 +1,7 @@
 <div class="card mb-4">
-        {% if property.filename %}
-            <img src="{{ vich_uploader_asset(property, 'imageFile') | imagine_filter('thumb') }}" alt="card-img-top"
-                 style="width: 100%;
-            height:
-            auto">
-            {% else %}
-                <img src="{{ asset('/assets/images/properties/placeholder.jpg')  }}"
-                     alt="card-img-top" style="width: 100%;  height: auto">
-        {% endif %}
+    <img src="{{ property.imageUrl(360, 230) }}" alt="{{ property.title }}"
+         onerror="this.onerror=null;this.src='{{ asset('/assets/images/properties/placeholder.jpg') }}';"
+         style="width: 100%; height: auto">
     <div class="card-body">
         <h5 class="card-title">
             <a href="{{ path('property.show', { slug: property.slug , id: property.id } ) }}">

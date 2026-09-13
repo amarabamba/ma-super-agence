@@ -14,6 +14,9 @@
             {%  for property in properties %}
                <div class="col-3">
                    <div class="card">
+                       <img src="{{ property.imageUrl(360, 230) }}" alt="{{ property.title }}"
+                            onerror="this.onerror=null;this.src='{{ asset('/assets/images/properties/placeholder.jpg') }}';"
+                            style="width: 100%; height: auto">
                        <div class="card-body">
                            <h5 class="card-title">
                                 <a href="{{ path('property.show', {id: property.id, slug: property.slug}) }}">{{ property.title }}</a>

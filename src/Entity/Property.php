@@ -194,6 +194,11 @@ class Property
         return number_format((int) $this->price, 0, '', ' ');
     }
 
+    public function getImageUrl(int $width = 800, int $height = 530): string
+    {
+        return sprintf('https://picsum.photos/seed/%d/%d/%d', $this->id ?? 0, $width, $height);
+    }
+
     public function getHeat(): ?int
     {
         return $this->heat;
